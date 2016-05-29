@@ -8,11 +8,7 @@ output:
     toc_depth: 2
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r}
+```{r include = FALSE}
 ###############################################################################
 # Project: Baseball
 # Author(s): Thomas Burr
@@ -26,7 +22,8 @@ When you click the **Knit** button a document will be generated that includes bo
 
 
 # libraries:
-librariesToLoad <- c('plyr','dplyr', 'tidyr','knitr', 'ggplot2','scales','ggthemes','Lahman')
+librariesToLoad <- c( 'plyr','tidyr','knitr', 'ggplot2',
+                     'scales','ggthemes','Lahman','dplyr')
 
 suppressWarnings(suppressMessages(expr={
     sapply(librariesToLoad, function(package) {
@@ -37,7 +34,7 @@ suppressWarnings(suppressMessages(expr={
             install.packages(package,repos="http://cran.rstudio.com/")
             
             if (require(package, character.only=TRUE)){
-                print(paste(package, "loaded correctly", sep=" "))
+              print(paste(package, "loaded correctly", sep=" "))
             } else {
                 stop(paste("Could not install", package, sep=" "))
             }
@@ -45,64 +42,85 @@ suppressWarnings(suppressMessages(expr={
     })
 }))
 
+
 ```
+#Overview
+
+"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
 
 #Data Summary
 
-From the Lahmann database, we pull player-year level batting statistics from "Batting." Notice it lacks several aggregate statistics such as batting average, plate appearances, total bases, slugging, OBP, OPS, etc.
+I use the Lahman R package to access the Lahman database, pulling player-year level batting statistics from "Batting." The Lahman package also automatically computes several statistics for us such as batting average, on-base percentage, and slugging percentage that are missing from the main data set. Strangely, it is missing a field for singles, so we need to construct that on our own. I also filter to NL/AL batters with at least one plate appearance.
 
-
-```{r}
-data(Batting)
-bstats = tbl_df(Batting)
-bstats
-```
-
-
-Luckily the Lahman package will automatically calculate these all for us and append them to the data. It also takes care of some convenient changes such as '2B' to 'X2B' in the variable name. Oddly it is still missing singles, which will be necessary for league wide slugging percentages.
 
 ```{r}
 #Bring in available "advanced" batting stats
 bstats <- tbl_df(battingStats())
 
-#Filter to NL/AL Only
-bstats <- bstats %>% filter(lgID == "NL" | lgID =="AL", PA > 0) 
-
 #Add singles as a category
 bstats <- bstats %>% mutate(X1B = H - X2B - X3B - HR)
 
+#Filter to NL/AL Only
+bstats <- bstats %>% filter(lgID == "NL" | lgID =="AL",
+                            yearID >= 1901,
+                            PA > 0)
+
+#Create ISO
+bstats$ISO = bstats$SlugPct - bstats$BA
+
 ```
 
-For each year, we would like to know who the league leaders were in batting average and slugging percentage. 
+For each year, we would like to know who the league leaders were in batting average (AVG), slugging percentage (SLG), and isolated power (ISO). For ease of computation, I also save each leader's numbers for all 3 categories. This, for example, will allow us to see how the ISO has changed over time for the typical batting average leader. 
 
 ```{r}
-ba_league_leaders <- bstats %>% filter(PA > 400 & yearID > 1910) %>% 
+ba_league_leaders <- bstats %>% filter(PA > 400 | AB > 500) %>% 
                                 group_by(yearID) %>% 
                                 slice(which.max(BA)) %>% 
                                 ungroup() %>% 
-                                select(ba_leader = playerID,yearID,ba_leader_ba = BA,ba_leader_slg = SlugPct )
+                                select(ba_leader = playerID,
+                                       yearID,
+                                       ba_leader_ba = BA,
+                                       ba_leader_slg = SlugPct,
+                                       ba_leader_iso = ISO)
 
-slg_league_leaders <- bstats %>% filter(PA > 400) %>% 
+slg_league_leaders <- bstats %>% filter(PA > 400 | AB > 500) %>% 
                                  group_by(yearID) %>% 
                                  slice(which.max(SlugPct)) %>% 
                                  ungroup() %>% 
-                                 select(slg_leader = playerID,yearID,slg_leader_slg = SlugPct,slg_leader_ba = BA)
+                                 select(slg_leader = playerID,
+                                        yearID,
+                                        slg_leader_slg = SlugPct,
+                                        slg_leader_ba = BA,
+                                        slg_leader_iso = ISO)
 
-league_leaders <- merge(ba_league_leaders,slg_league_leaders,by="yearID")
+iso_league_leaders <- bstats %>% filter(PA > 400 | AB > 500) %>% 
+                                 group_by(yearID) %>% 
+                                 slice(which.max(ISO)) %>% 
+                                 ungroup() %>% 
+                                 select(iso_leader = playerID,
+                                        yearID,
+                                        iso_leader_slg = SlugPct,
+                                        iso_leader_ba = BA,
+                                        iso_leader_iso = ISO)
 
+league_leaders <- merge(ba_league_leaders,slg_league_leaders,by = "yearID")
+league_leaders <- merge(league_leaders,iso_league_leaders,by = "yearID")
 
 
 bstats <- left_join(bstats,league_leaders, by = "yearID")
 
-
+ggplot(iso_league_leaders,aes(x= yearID,y = iso_leader_iso,label = iso_leader)) + geom_text()
 ```
 
 
-Lets compute the average batting average, slugging, etc. for each season for the players who had at least 100 ABs
+Include in stdev everyone with at least 200 at bats
 
 ```{r}
+try (detach('package:plyr'))
 yearly_bstats <- bstats %>% filter(PA > 400)
-yearly_bstats <- yearly_bstats %>% group_by(yearID) %>% summarize(
+yearly_bstats <- yearly_bstats %>% group_by(yearID) %>% summarise(
+                                              num_qualified = n(),
                                               ba_std = sd(BA),
                                               slg_std = sd(SlugPct),
                                               ba_avg = mean(BA),
@@ -117,22 +135,10 @@ One problem, however, is that these stats can only be calculated at the player l
 
 
 ```{r}
-#yearly_bstats <- bstats %>% group_by(yearID) %>% summarize(PA = sum(PA),AB = sum(AB), H = sum(H),
-#                                                               BB = sum(BB),HBP = sum(HBP), X1B = sum(X1B), 
-#                                                               X2B = sum(X2B),X3B = sum(X3B), HR = sum(HR),
-#                                                               SF = sum(SF),
-#                                                               SF = max(SF,0,na.rm=TRUE))
-#yearly_bstats <- yearly_bstats %>% mutate(BA = H/AB, 
-#                                                  OBP = (H + BB + HBP)/(AB + BB + HBP + SF),
-#                                                  SLG = (X1B + 2 * X2B + 3 * X3B + 4 * HR)/AB,
-#                                                  OPS = OBP + SLG)
-
-
-
 
 ggplot(yearly_bstats,aes(x = yearID,y = ba_avg)) + geom_line() + theme_wsj() + scale_y_continuous(breaks = c(.240,.250,.260,.270,.280,.290,.300,.310),
-                                                                                                  labels = c('.240','.250','.260','.270',
-                                                                                                             '.280','.290','.300','.310'))
+                   labels = c('.240','.250','.260','.270',
+                              '.280','.290','.300','.310'))
 
 tidy_batting_percentages <- gather(yearly_bstats,statistic,average,ba_avg,slg_avg)
 
@@ -174,9 +180,8 @@ bstats <- bstats %>% filter(PA > 400) %>% mutate(std_away_ba = (BA - ba_avg)/ba_
                                           std_away_slg = (SlugPct - slg_avg)/slg_std)
 
 ggplot(yearly_bstats,aes(x=yearID,y=std_away_ba,label = ba_leader)) + geom_text()
+ggplot(yearly_bstats,aes(x=yearID,y=std_away_slg,label = slg_leader)) + geom_text()
 
-bstats %>% filter(PA > 400)
 
 
 ```
-
