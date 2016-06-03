@@ -1,0 +1,155 @@
+<p>#Overview</p>
+
+<p>“Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
+<p>#Data Summary</p>
+
+<p>I use the Lahman R package to access the Lahman database, pulling player-year level batting statistics from “Batting.” The Lahman package also automatically computes several statistics for us such as batting average, on-base percentage, and slugging percentage that are missing from the main data set. Strangely, it is missing a field for singles, so we need to construct that on our own. I also filter to NL/AL batters with at least one plate appearance.</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="c1">#Bring in available "advanced" batting stats
+</span><span class="n">bstats</span> <span class="o">&lt;-</span> <span class="n">tbl_df</span><span class="p">(</span><span class="n">battingStats</span><span class="p">())</span>
+
+<span class="c1">#Add singles as a category
+</span><span class="n">bstats</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">mutate</span><span class="p">(</span><span class="n">X1B</span> <span class="o">=</span> <span class="n">H</span> <span class="o">-</span> <span class="n">X2B</span> <span class="o">-</span> <span class="n">X3B</span> <span class="o">-</span> <span class="n">HR</span><span class="p">)</span>
+
+<span class="c1">#Filter to NL/AL Only
+</span><span class="n">bstats</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">filter</span><span class="p">(</span><span class="n">lgID</span> <span class="o">==</span> <span class="s2">"NL"</span> <span class="o">|</span> <span class="n">lgID</span> <span class="o">==</span><span class="s2">"AL"</span><span class="p">,</span>
+                            <span class="n">yearID</span> <span class="o">&gt;=</span> <span class="m">1901</span><span class="p">,</span>
+                            <span class="n">PA</span> <span class="o">&gt;</span> <span class="m">0</span><span class="p">)</span>
+
+<span class="c1">#Create ISO
+</span><span class="n">bstats</span><span class="o">$</span><span class="n">ISO</span> <span class="o">=</span> <span class="n">bstats</span><span class="o">$</span><span class="n">SlugPct</span> <span class="o">-</span> <span class="n">bstats</span><span class="o">$</span><span class="n">BA</span>
+</code></pre>
+</div>
+
+<p>For each year, we would like to know who the league leaders were in batting average (AVG), slugging percentage (SLG), and isolated power (ISO). For ease of computation, I also save each leader’s numbers for all 3 categories. This, for example, will allow us to see how the ISO has changed over time for the typical batting average leader.</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ba_league_leaders</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">filter</span><span class="p">(</span><span class="n">PA</span> <span class="o">&gt;</span> <span class="m">400</span> <span class="o">|</span> <span class="n">AB</span> <span class="o">&gt;</span> <span class="m">500</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+                                <span class="n">group_by</span><span class="p">(</span><span class="n">yearID</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+                                <span class="n">slice</span><span class="p">(</span><span class="n">which.max</span><span class="p">(</span><span class="n">BA</span><span class="p">))</span> <span class="o">%&gt;%</span> 
+                                <span class="n">ungroup</span><span class="p">()</span> <span class="o">%&gt;%</span> 
+                                <span class="n">select</span><span class="p">(</span><span class="n">ba_leader</span> <span class="o">=</span> <span class="n">playerID</span><span class="p">,</span>
+                                       <span class="n">yearID</span><span class="p">,</span>
+                                       <span class="n">ba_leader_ba</span> <span class="o">=</span> <span class="n">BA</span><span class="p">,</span>
+                                       <span class="n">ba_leader_slg</span> <span class="o">=</span> <span class="n">SlugPct</span><span class="p">,</span>
+                                       <span class="n">ba_leader_iso</span> <span class="o">=</span> <span class="n">ISO</span><span class="p">)</span>
+
+<span class="n">slg_league_leaders</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">filter</span><span class="p">(</span><span class="n">PA</span> <span class="o">&gt;</span> <span class="m">400</span> <span class="o">|</span> <span class="n">AB</span> <span class="o">&gt;</span> <span class="m">500</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">group_by</span><span class="p">(</span><span class="n">yearID</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">slice</span><span class="p">(</span><span class="n">which.max</span><span class="p">(</span><span class="n">SlugPct</span><span class="p">))</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">ungroup</span><span class="p">()</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">select</span><span class="p">(</span><span class="n">slg_leader</span> <span class="o">=</span> <span class="n">playerID</span><span class="p">,</span>
+                                        <span class="n">yearID</span><span class="p">,</span>
+                                        <span class="n">slg_leader_slg</span> <span class="o">=</span> <span class="n">SlugPct</span><span class="p">,</span>
+                                        <span class="n">slg_leader_ba</span> <span class="o">=</span> <span class="n">BA</span><span class="p">,</span>
+                                        <span class="n">slg_leader_iso</span> <span class="o">=</span> <span class="n">ISO</span><span class="p">)</span>
+
+<span class="n">iso_league_leaders</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">filter</span><span class="p">(</span><span class="n">PA</span> <span class="o">&gt;</span> <span class="m">400</span> <span class="o">|</span> <span class="n">AB</span> <span class="o">&gt;</span> <span class="m">500</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">group_by</span><span class="p">(</span><span class="n">yearID</span><span class="p">)</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">slice</span><span class="p">(</span><span class="n">which.max</span><span class="p">(</span><span class="n">ISO</span><span class="p">))</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">ungroup</span><span class="p">()</span> <span class="o">%&gt;%</span> 
+                                 <span class="n">select</span><span class="p">(</span><span class="n">iso_leader</span> <span class="o">=</span> <span class="n">playerID</span><span class="p">,</span>
+                                        <span class="n">yearID</span><span class="p">,</span>
+                                        <span class="n">iso_leader_slg</span> <span class="o">=</span> <span class="n">SlugPct</span><span class="p">,</span>
+                                        <span class="n">iso_leader_ba</span> <span class="o">=</span> <span class="n">BA</span><span class="p">,</span>
+                                        <span class="n">iso_leader_iso</span> <span class="o">=</span> <span class="n">ISO</span><span class="p">)</span>
+
+<span class="n">league_leaders</span> <span class="o">&lt;-</span> <span class="n">merge</span><span class="p">(</span><span class="n">ba_league_leaders</span><span class="p">,</span><span class="n">slg_league_leaders</span><span class="p">,</span><span class="n">by</span> <span class="o">=</span> <span class="s2">"yearID"</span><span class="p">)</span>
+<span class="n">league_leaders</span> <span class="o">&lt;-</span> <span class="n">merge</span><span class="p">(</span><span class="n">league_leaders</span><span class="p">,</span><span class="n">iso_league_leaders</span><span class="p">,</span><span class="n">by</span> <span class="o">=</span> <span class="s2">"yearID"</span><span class="p">)</span>
+
+
+<span class="n">bstats</span> <span class="o">&lt;-</span> <span class="n">left_join</span><span class="p">(</span><span class="n">bstats</span><span class="p">,</span><span class="n">league_leaders</span><span class="p">,</span> <span class="n">by</span> <span class="o">=</span> <span class="s2">"yearID"</span><span class="p">)</span>
+
+<span class="n">ggplot</span><span class="p">(</span><span class="n">iso_league_leaders</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">iso_leader_iso</span><span class="p">,</span><span class="n">label</span> <span class="o">=</span> <span class="n">iso_leader</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_text</span><span class="p">()</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-3-1.png" alt="plot of chunk unnamed-chunk-3" /></p>
+
+<p>Include in stdev everyone with at least 200 at bats</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">try</span> <span class="p">(</span><span class="n">detach</span><span class="p">(</span><span class="s1">'package:plyr'</span><span class="p">))</span>
+<span class="n">yearly_bstats</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">filter</span><span class="p">(</span><span class="n">PA</span> <span class="o">&gt;</span> <span class="m">400</span><span class="p">)</span>
+<span class="n">yearly_bstats</span> <span class="o">&lt;-</span> <span class="n">yearly_bstats</span> <span class="o">%&gt;%</span> <span class="n">group_by</span><span class="p">(</span><span class="n">yearID</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">summarise</span><span class="p">(</span>
+                                              <span class="n">num_qualified</span> <span class="o">=</span> <span class="n">n</span><span class="p">(),</span>
+                                              <span class="n">ba_std</span> <span class="o">=</span> <span class="n">sd</span><span class="p">(</span><span class="n">BA</span><span class="p">),</span>
+                                              <span class="n">slg_std</span> <span class="o">=</span> <span class="n">sd</span><span class="p">(</span><span class="n">SlugPct</span><span class="p">),</span>
+                                              <span class="n">ba_avg</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">BA</span><span class="p">),</span>
+                                              <span class="n">slg_avg</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">SlugPct</span><span class="p">))</span>
+
+<span class="n">bstats</span> <span class="o">&lt;-</span> <span class="n">left_join</span><span class="p">(</span><span class="n">bstats</span><span class="p">,</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">by</span><span class="o">=</span> <span class="s1">'yearID'</span><span class="p">)</span>
+<span class="n">yearly_bstats</span> <span class="o">&lt;-</span> <span class="n">merge</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">league_leaders</span><span class="p">,</span><span class="n">by</span><span class="o">=</span><span class="s2">"yearID"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>One problem, however, is that these stats can only be calculated at the player level. Thus if we were to, for example, average all batting averages in a year, a player with 50 PA would weight equally as one with 500. We can get around this by creating a year-level total of the underlying stats (Hits, walks, 2B, HR etc.) and recalculating the percentages at a year level.</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">ba_avg</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_line</span><span class="p">()</span> <span class="o">+</span> <span class="n">theme_wsj</span><span class="p">()</span> <span class="o">+</span> <span class="n">scale_y_continuous</span><span class="p">(</span><span class="n">breaks</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="m">.240</span><span class="p">,</span><span class="m">.250</span><span class="p">,</span><span class="m">.260</span><span class="p">,</span><span class="m">.270</span><span class="p">,</span><span class="m">.280</span><span class="p">,</span><span class="m">.290</span><span class="p">,</span><span class="m">.300</span><span class="p">,</span><span class="m">.310</span><span class="p">),</span>
+                   <span class="n">labels</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="s1">'.240'</span><span class="p">,</span><span class="s1">'.250'</span><span class="p">,</span><span class="s1">'.260'</span><span class="p">,</span><span class="s1">'.270'</span><span class="p">,</span>
+                              <span class="s1">'.280'</span><span class="p">,</span><span class="s1">'.290'</span><span class="p">,</span><span class="s1">'.300'</span><span class="p">,</span><span class="s1">'.310'</span><span class="p">))</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-5-1.png" alt="plot of chunk unnamed-chunk-5" /></p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">tidy_batting_percentages</span> <span class="o">&lt;-</span> <span class="n">gather</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">statistic</span><span class="p">,</span><span class="n">average</span><span class="p">,</span><span class="n">ba_avg</span><span class="p">,</span><span class="n">slg_avg</span><span class="p">)</span>
+
+
+<span class="n">ggplot</span><span class="p">(</span><span class="n">tidy_batting_percentages</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">average</span><span class="p">,</span><span class="n">color</span> <span class="o">=</span> <span class="n">statistic</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_line</span><span class="p">()</span> <span class="o">+</span> <span class="n">theme_wsj</span><span class="p">()</span> 
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-5-2.png" alt="plot of chunk unnamed-chunk-5" /></p>
+
+<p>Batting Average vs league leader?</p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">ba_avg</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_line</span><span class="p">()</span> <span class="o">+</span><span class="n">stat_smooth</span><span class="p">(</span><span class="n">method</span> <span class="o">=</span> <span class="s2">"lm"</span><span class="p">)</span> <span class="o">+</span> <span class="n">theme_wsj</span><span class="p">()</span> <span class="o">+</span><span class="n">ylim</span><span class="p">(</span><span class="m">.200</span><span class="p">,</span><span class="m">.450</span><span class="p">)</span> <span class="o">+</span><span class="n">geom_point</span><span class="p">(</span><span class="n">data</span> <span class="o">=</span> <span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">yearID</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="n">ba_leader_ba</span><span class="p">))</span> <span class="o">+</span> <span class="n">theme_fivethirtyeight</span><span class="p">()</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-6-1.png" alt="plot of chunk unnamed-chunk-6" /></p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">yearly_bstats</span><span class="o">$</span><span class="n">ba_max_spread</span> <span class="o">&lt;-</span> <span class="n">yearly_bstats</span><span class="o">$</span><span class="n">ba_leader_ba</span> <span class="o">-</span> <span class="n">yearly_bstats</span><span class="o">$</span><span class="n">ba_avg</span>
+
+<span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">ba_max_spread</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="n">ba_leader</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_point</span><span class="p">()</span> <span class="o">+</span><span class="n">stat_smooth</span><span class="p">()</span> <span class="o">+</span> <span class="n">theme_wsj</span><span class="p">()</span> <span class="o">+</span><span class="n">ylim</span><span class="p">(</span><span class="m">0</span><span class="p">,</span><span class="m">.200</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-6-2.png" alt="plot of chunk unnamed-chunk-6" /></p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">slg_avg</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_line</span><span class="p">()</span> <span class="o">+</span><span class="n">stat_smooth</span><span class="p">(</span><span class="n">method</span> <span class="o">=</span> <span class="s2">"lm"</span><span class="p">)</span> <span class="o">+</span> <span class="n">theme_wsj</span><span class="p">()</span> <span class="o">+</span><span class="n">ylim</span><span class="p">(</span><span class="m">.300</span><span class="p">,</span><span class="m">.800</span><span class="p">)</span> <span class="o">+</span><span class="n">geom_point</span><span class="p">(</span><span class="n">data</span> <span class="o">=</span> <span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">yearID</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="n">slg_leader_slg</span><span class="p">))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>## Warning in loop_apply(n, do.ply): Removed 4 rows containing missing values
+## (geom_point).
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-7-1.png" alt="plot of chunk unnamed-chunk-7" /></p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">yearly_bstats</span><span class="o">$</span><span class="n">max_slg_spread</span><span class="o">&lt;-</span> <span class="n">yearly_bstats</span><span class="o">$</span><span class="n">slg_leader_slg</span><span class="o">-</span> <span class="n">yearly_bstats</span><span class="o">$</span><span class="n">slg_avg</span>
+
+<span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">yearID</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">max_slg_spread</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_point</span><span class="p">()</span> <span class="o">+</span><span class="n">stat_smooth</span><span class="p">(</span><span class="n">method</span> <span class="o">=</span> <span class="s2">"lm"</span><span class="p">)</span> <span class="o">+</span> <span class="n">theme_fivethirtyeight</span><span class="p">()</span> <span class="o">+</span><span class="n">ylim</span><span class="p">(</span><span class="m">0</span><span class="p">,</span><span class="m">.500</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-7-2.png" alt="plot of chunk unnamed-chunk-7" /></p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">yearly_bstats</span> <span class="o">&lt;-</span> <span class="n">yearly_bstats</span> <span class="o">%&gt;%</span> <span class="n">mutate</span><span class="p">(</span><span class="n">std_away_ba</span> <span class="o">=</span> <span class="p">(</span><span class="n">ba_leader_ba</span> <span class="o">-</span> <span class="n">ba_avg</span><span class="p">)</span><span class="o">/</span><span class="n">ba_std</span><span class="p">,</span>
+                                          <span class="n">std_away_slg</span> <span class="o">=</span> <span class="p">(</span><span class="n">slg_leader_slg</span> <span class="o">-</span> <span class="n">slg_avg</span><span class="p">)</span><span class="o">/</span><span class="n">slg_std</span><span class="p">)</span>
+
+<span class="n">bstats</span> <span class="o">&lt;-</span> <span class="n">bstats</span> <span class="o">%&gt;%</span> <span class="n">filter</span><span class="p">(</span><span class="n">PA</span> <span class="o">&gt;</span> <span class="m">400</span><span class="p">)</span> <span class="o">%&gt;%</span> <span class="n">mutate</span><span class="p">(</span><span class="n">std_away_ba</span> <span class="o">=</span> <span class="p">(</span><span class="n">BA</span> <span class="o">-</span> <span class="n">ba_avg</span><span class="p">)</span><span class="o">/</span><span class="n">ba_std</span><span class="p">,</span>
+                                          <span class="n">std_away_slg</span> <span class="o">=</span> <span class="p">(</span><span class="n">SlugPct</span> <span class="o">-</span> <span class="n">slg_avg</span><span class="p">)</span><span class="o">/</span><span class="n">slg_std</span><span class="p">)</span>
+
+<span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">yearID</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="n">std_away_ba</span><span class="p">,</span><span class="n">label</span> <span class="o">=</span> <span class="n">ba_leader</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_text</span><span class="p">()</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-8-1.png" alt="plot of chunk unnamed-chunk-8" /></p>
+
+<div class="language-r highlighter-rouge"><pre class="highlight"><code><span class="n">ggplot</span><span class="p">(</span><span class="n">yearly_bstats</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">yearID</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="n">std_away_slg</span><span class="p">,</span><span class="n">label</span> <span class="o">=</span> <span class="n">slg_leader</span><span class="p">))</span> <span class="o">+</span> <span class="n">geom_text</span><span class="p">()</span>
+</code></pre>
+</div>
+
+<p><img src="/figure/./baseball_stuff copy/unnamed-chunk-8-2.png" alt="plot of chunk unnamed-chunk-8" /></p>
